@@ -37,6 +37,12 @@ class Article(Base):
     category: Mapped[str] = mapped_column(String(50), index=True)
     summary: Mapped[str] = mapped_column(Text, default="")
 
+    # 关键词信号分析结果（见 app/processing/signals.py）：
+    # sentiment_score 是命中信号极性之和的粗略情绪分，signal_tags 是逗号分隔的信号代码，
+    # 两者都是"抓取时的规则匹配快照"，用于 /insights 简报页的聚合统计与新闻卡片标签展示。
+    sentiment_score: Mapped[int] = mapped_column(Integer, default=0, index=True)
+    signal_tags: Mapped[str | None] = mapped_column(String(200), nullable=True)
+
     published_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
     fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 

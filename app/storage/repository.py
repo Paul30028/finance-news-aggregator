@@ -34,6 +34,8 @@ async def insert_article_if_new(
     summary: str,
     published_at: datetime,
     fetched_at: datetime,
+    sentiment_score: int = 0,
+    signal_tags: Optional[str] = None,
 ) -> bool:
     """插入一篇文章；若 content_hash 已存在则忽略。返回是否为"新入库"。
 
@@ -52,6 +54,8 @@ async def insert_article_if_new(
             summary=summary,
             published_at=published_at,
             fetched_at=fetched_at,
+            sentiment_score=sentiment_score,
+            signal_tags=signal_tags,
         )
         .on_conflict_do_nothing(index_elements=[Article.content_hash])
     )
@@ -105,6 +109,23 @@ async def count_articles(
         stmt = stmt.where(Article.title.like(like) | Article.summary.like(like))
     result = await session.execute(stmt)
     return result.scalar_one()
+
+
+async def list_articles_since(
+    session: AsyncSession,
+    *,
+    since: datetime,
+    limit: int = 1000,
+) -> Sequence[Article]:
+    """获取 fetched_at 不早于 since 的所有文章，供 /insights 简报页做窗口内聚合统计使用。"""
+    stmt = (
+        select(Article)
+        .where(Article.fetched_at >= since)
+        .order_by(Article.published_at.desc())
+        .limit(limit)
+    )
+    result = await session.execute(stmt)
+    return result.scalars().all()
 
 
 async def distinct_categories(session: AsyncSession) -> list[str]:

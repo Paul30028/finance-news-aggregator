@@ -40,6 +40,9 @@
 5. **即时性**：每个源拥有独立的抓取循环（互不等待），抓到新文章立即入库、立即通过 SSE
    推送到所有打开着的浏览器、立即触发 Webhook/Telegram——不存在"等整轮抓取结束才统一报出"
    的延迟。详见下方"即时性设计"一节。
+6. **分析透明可审计**：`/insights` 策略简报页对新闻做的是公开、可读的关键词规则匹配统计，
+   不是黑箱模型推理，每一条统计都能追溯到具体文章和具体命中的关键词。详见下方
+   "策略简报与信号分析"一节，**该功能不构成投资建议**。
 
 ## 二、目录结构
 
@@ -60,7 +63,10 @@ finance-news-aggregator/
 │   │   └── engine.py           # 抓取引擎，编排上述所有组件
 │   ├── processing/
 │   │   ├── cleaner.py          # 内容清洗（去HTML、截断摘要、屏蔽词过滤）
-│   │   └── classifier.py       # 关键词分类
+│   │   ├── classifier.py       # 关键词分类
+│   │   └── signals.py          # 关键词信号提取（利好/利空事件识别 + 情绪打分）
+│   ├── analysis/
+│   │   └── briefing.py         # 策略简报聚合（窗口内信号/分类统计，供 /insights 使用）
 │   ├── storage/
 │   │   ├── models.py           # SQLAlchemy ORM 模型
 │   │   ├── db.py                # 异步引擎/会话
@@ -68,7 +74,7 @@ finance-news-aggregator/
 │   ├── notify/
 │   │   └── dispatcher.py       # Webhook / Telegram 推送
 │   └── web/
-│       ├── routes.py           # HTML 页面 + JSON API
+│       ├── routes.py           # HTML 页面 + JSON API（含 /insights 策略简报）
 │       ├── schemas.py          # Pydantic 请求模型
 │       ├── templates/          # Jinja2 模板（原生 HTML + 少量 JS 轮询刷新）
 │       └── static/              # CSS / JS
@@ -190,7 +196,7 @@ curl -X POST http://localhost:8000/api/sources \
 ## 五、即时性设计
 
 财经新闻的价值很大程度上取决于"多快看到"，因此本项目在多个层面专门做了即时性优化，
-同时不牺牲第七节所述的合规底线：
+同时不牺牲第九节所述的合规底线：
 
 1. **按源独立调度**（`app/scheduler.py`）：不再是"所有源排队跑完一整轮再一起休眠"，
    每个源各自有一条抓取循环，抓完立刻按自己的 `interval_seconds`（未设置则用全局
@@ -211,6 +217,48 @@ curl -X POST http://localhost:8000/api/sources \
    本项目据此跳过解析，既保证了"该快的时候快"，也保证了"不该抓的时候不多抓"。
 6. **"刚刚 / N 分钟前 + NEW 徽标"**：列表按 `published_at` 展示相对时间，
    `fetched_at` 在 5 分钟内的文章额外标红显示 `NEW` 徽标，直观呈现新鲜度。
+
+## 六、策略简报与信号分析
+
+> ⚠️ **免责声明**：本节描述的功能是对已抓取公开新闻做**关键词规则匹配**与**结果统计**，
+> 全部逻辑都在 `app/processing/signals.py`（规则表）和 `app/analysis/briefing.py`（聚合）
+> 中，可直接阅读源码核实。它不是情感分析模型、不做语义理解、不预测走势，**输出结果不构成
+> 任何投资建议**，仅作为快速浏览大量新闻时的辅助整理工具。据此做出的任何投资决策，风险自负。
+
+**信号词库**（`app/processing/signals.py` 中的 `SIGNAL_RULES`）把常见财经事件分成 13
+类，每类标注一个极性（利好 `+1` / 利空 `-1` / 中性 `0`，中性代表"方向不确定，需结合上下文"，
+如并购、IPO）：
+
+| 信号 | 极性 | 示例关键词 |
+|---|---|---|
+| 货币宽松/降息 | + | 降息、降准、rate cut |
+| 货币紧缩/加息 | − | 加息、rate hike |
+| 业绩超预期 | + | 业绩超预期、beats estimates |
+| 业绩不及预期 | − | 业绩预警、misses estimates |
+| 评级/目标价上调 | + | 上调评级、upgrades |
+| 评级/目标价下调 | − | 下调评级、downgrades |
+| 回购/增持/分红 | + | 回购、share buyback |
+| 减持/抛售 | − | 减持、stake sale |
+| 并购重组 | 0 | 收购、merger |
+| 监管/合规风险 | − | 调查、处罚、investigation |
+| 违约/破产风险 | − | 违约、bankruptcy |
+| IPO/新上市 | 0 | IPO、goes public |
+| 供给端变化 | 0 | 减产、supply cut |
+
+每篇文章抓取时会自动匹配这份规则表，命中的信号类型（去重后）汇总出一个整数"情绪分"
+（极性之和），随文章一起存入数据库；新闻卡片上会显示对应的信号标签（如"▲ 货币宽松/降息"）。
+
+**`/insights` 策略简报页**基于这些数据在选定时间窗口（6小时/24小时/3天/7天）内做聚合：
+
+- 窗口内新闻总数、偏利好/偏利空/中性数量
+- 情绪分最高（偏利好）与最低（偏利空）的新闻排行
+- 热门分类排行（哪个板块新闻最多）
+- 信号词命中排行（哪类事件本轮窗口内出现最频繁）
+
+也可以调用 `GET /api/insights?window=24` 获取同样的数据（JSON 格式，含 `disclaimer` 字段）。
+
+**如何扩展规则**：直接编辑 `app/processing/signals.py` 中的 `SIGNAL_RULES` 列表，
+增删信号类型或关键词即可，无需改动其他代码——`/insights` 页面和 API 会自动反映新规则。
 
 ## 七、配置说明（`config/config.yaml`）
 

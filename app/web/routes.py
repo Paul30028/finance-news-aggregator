@@ -18,7 +18,9 @@ from fastapi import APIRouter, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 
+from app.analysis.briefing import build_briefing
 from app.config import SourceConfig, get_settings, reload_settings, save_sources
+from app.processing.signals import decode_signal_tags
 from app.scheduler import scheduler
 from app.storage.db import get_session
 from app.storage.repository import (
@@ -82,6 +84,7 @@ def _tier_label(tier: str | None) -> str:
 templates.env.filters["relative_time"] = _relative_time
 templates.env.filters["is_recent"] = _is_recent
 templates.env.filters["tier_label"] = _tier_label
+templates.env.filters["signals"] = decode_signal_tags
 
 
 async def _fetch_page(
@@ -160,6 +163,53 @@ async def partial_news_list(
             "current_q": q or "",
         },
     )
+
+
+@router.get("/insights", response_class=HTMLResponse)
+async def insights_page(request: Request, window: int = Query(default=24, ge=1, le=168)):
+    """策略简报页：基于关键词信号规则对窗口内新闻做聚合统计，仅供参考、不构成投资建议。"""
+    async with get_session() as session:
+        briefing = await build_briefing(session, window_hours=window)
+    return templates.TemplateResponse(
+        "insights.html",
+        {"request": request, "briefing": briefing, "window": window},
+    )
+
+
+@router.get("/api/insights")
+async def api_insights(window: int = Query(default=24, ge=1, le=168)):
+    async with get_session() as session:
+        briefing = await build_briefing(session, window_hours=window)
+
+    def _article_dict(a):
+        return {
+            "id": a.id,
+            "title": a.title,
+            "link": a.link,
+            "source": a.source_name,
+            "tier": a.source_tier,
+            "category": a.category,
+            "sentiment_score": a.sentiment_score,
+            "signals": [{"code": c, "label": l, "polarity": p} for c, l, p in a.signals],
+            "published_at": a.published_at.isoformat(),
+        }
+
+    return {
+        "window_hours": briefing.window_hours,
+        "generated_at": briefing.generated_at.isoformat(),
+        "total_articles": briefing.total_articles,
+        "bullish_count": briefing.bullish_count,
+        "bearish_count": briefing.bearish_count,
+        "neutral_count": briefing.neutral_count,
+        "top_bullish": [_article_dict(a) for a in briefing.top_bullish],
+        "top_bearish": [_article_dict(a) for a in briefing.top_bearish],
+        "category_counts": [{"category": c.category, "count": c.count} for c in briefing.category_counts],
+        "signal_counts": [
+            {"code": s.code, "label": s.label, "polarity": s.polarity, "count": s.count}
+            for s in briefing.signal_counts
+        ],
+        "disclaimer": "以上内容基于公开新闻标题/摘要的关键词规则匹配自动生成，仅供参考，不构成任何投资建议。",
+    }
 
 
 @router.get("/sources", response_class=HTMLResponse)

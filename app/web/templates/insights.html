@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}策略简报{% endblock %}
+{% block content %}
+<section class="insights-header">
+  <div class="window-picker">
+    <span>统计窗口：</span>
+    <a href="/insights?window=6" class="{{ 'active' if window == 6 else '' }}">6小时</a>
+    <a href="/insights?window=24" class="{{ 'active' if window == 24 else '' }}">24小时</a>
+    <a href="/insights?window=72" class="{{ 'active' if window == 72 else '' }}">3天</a>
+    <a href="/insights?window=168" class="{{ 'active' if window == 168 else '' }}">7天</a>
+  </div>
+  <p class="disclaimer">
+    ⚠️ 以下统计基于新闻标题/摘要的关键词规则匹配自动生成（规则见
+    <code>app/processing/signals.py</code>），是对已抓取公开新闻的客观整理，
+    <strong>不构成任何投资建议</strong>，据此操作风险自负。
+  </p>
+</section>
+
+<section class="stat-tiles">
+  <div class="stat-tile">
+    <div class="stat-value">{{ briefing.total_articles }}</div>
+    <div class="stat-label">窗口内新闻总数</div>
+  </div>
+  <div class="stat-tile stat-pos">
+    <div class="stat-value">{{ briefing.bullish_count }}</div>
+    <div class="stat-label">偏利好信号</div>
+  </div>
+  <div class="stat-tile stat-neg">
+    <div class="stat-value">{{ briefing.bearish_count }}</div>
+    <div class="stat-label">偏利空信号</div>
+  </div>
+  <div class="stat-tile">
+    <div class="stat-value">{{ briefing.neutral_count }}</div>
+    <div class="stat-label">中性/未命中规则</div>
+  </div>
+</section>
+
+<section class="insights-columns">
+  <div class="insights-col">
+    <h3>热门分类</h3>
+    {% if briefing.category_counts %}
+    <ul class="rank-list">
+      {% set max_count = briefing.category_counts[0].count %}
+      {% for c in briefing.category_counts %}
+      <li>
+        <span class="rank-label">{{ c.category }}</span>
+        <span class="rank-bar-track"><span class="rank-bar" style="width: {{ (c.count / max_count * 100)|round(0, 'floor') }}%"></span></span>
+        <span class="rank-count">{{ c.count }}</span>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="empty-hint">窗口内暂无数据</p>
+    {% endif %}
+  </div>
+
+  <div class="insights-col">
+    <h3>信号词命中排行</h3>
+    {% if briefing.signal_counts %}
+    <ul class="rank-list">
+      {% set max_sig = briefing.signal_counts[0].count %}
+      {% for s in briefing.signal_counts %}
+      <li>
+        <span class="rank-label">
+          <span class="signal-dot {{ 'signal-pos' if s.polarity > 0 else ('signal-neg' if s.polarity < 0 else 'signal-neutral') }}"></span>
+          {{ s.label }}
+        </span>
+        <span class="rank-bar-track"><span class="rank-bar" style="width: {{ (s.count / max_sig * 100)|round(0, 'floor') }}%"></span></span>
+        <span class="rank-count">{{ s.count }}</span>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="empty-hint">窗口内未命中任何预设信号词</p>
+    {% endif %}
+  </div>
+</section>
+
+<section class="insights-columns">
+  <div class="insights-col">
+    <h3>重点关注 · 偏利好</h3>
+    {% for a in briefing.top_bullish %}
+    <article class="news-card compact">
+      <div class="news-meta">
+        <span class="badge badge-tier badge-tier-{{ a.source_tier or 'none' }}">{{ a.source_tier|tier_label }}</span>
+        <span class="badge badge-category">{{ a.category }}</span>
+        <span class="badge badge-source">{{ a.source_name }}</span>
+        <time>{{ a.published_at|relative_time }}</time>
+      </div>
+      <h4 class="news-title"><a href="{{ a.link }}" target="_blank" rel="noopener noreferrer">{{ a.title }}</a></h4>
+      <div class="signal-tags">
+        {% for code, label, polarity in a.signals %}
+        <span class="signal-chip {{ 'signal-pos' if polarity > 0 else ('signal-neg' if polarity < 0 else 'signal-neutral') }}">
+          {{ "▲" if polarity > 0 else ("▼" if polarity < 0 else "●") }} {{ label }}
+        </span>
+        {% endfor %}
+      </div>
+    </article>
+    {% else %}
+    <p class="empty-hint">窗口内暂无偏利好信号的新闻</p>
+    {% endfor %}
+  </div>
+
+  <div class="insights-col">
+    <h3>重点关注 · 偏利空</h3>
+    {% for a in briefing.top_bearish %}
+    <article class="news-card compact">
+      <div class="news-meta">
+        <span class="badge badge-tier badge-tier-{{ a.source_tier or 'none' }}">{{ a.source_tier|tier_label }}</span>
+        <span class="badge badge-category">{{ a.category }}</span>
+        <span class="badge badge-source">{{ a.source_name }}</span>
+        <time>{{ a.published_at|relative_time }}</time>
+      </div>
+      <h4 class="news-title"><a href="{{ a.link }}" target="_blank" rel="noopener noreferrer">{{ a.title }}</a></h4>
+      <div class="signal-tags">
+        {% for code, label, polarity in a.signals %}
+        <span class="signal-chip {{ 'signal-pos' if polarity > 0 else ('signal-neg' if polarity < 0 else 'signal-neutral') }}">
+          {{ "▲" if polarity > 0 else ("▼" if polarity < 0 else "●") }} {{ label }}
+        </span>
+        {% endfor %}
+      </div>
+    </article>
+    {% else %}
+    <p class="empty-hint">窗口内暂无偏利空信号的新闻</p>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}

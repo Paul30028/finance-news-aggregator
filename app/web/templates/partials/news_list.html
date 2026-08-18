@@ -13,6 +13,16 @@
   {% if a.summary %}
   <p class="news-summary">{{ a.summary }}</p>
   {% endif %}
+  {% set sigs = a.signal_tags|signals %}
+  {% if sigs %}
+  <div class="signal-tags">
+    {% for code, label, polarity in sigs %}
+    <span class="signal-chip {{ 'signal-pos' if polarity > 0 else ('signal-neg' if polarity < 0 else 'signal-neutral') }}">
+      {{ "▲" if polarity > 0 else ("▼" if polarity < 0 else "●") }} {{ label }}
+    </span>
+    {% endfor %}
+  </div>
+  {% endif %}
 </article>
 {% else %}
 <p class="empty-hint">暂无符合条件的新闻，等待下一轮抓取或调整筛选条件。</p>

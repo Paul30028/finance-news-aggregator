@@ -24,6 +24,7 @@ from app.crawler.rss_parser import RawArticle, parse_rss
 from app.notify.dispatcher import dispatch_new_articles
 from app.processing.classifier import classify
 from app.processing.cleaner import CleanedArticle, clean_article, is_blocked
+from app.processing.signals import compute_sentiment_score, encode_signal_tags, extract_signals
 from app.storage.db import get_session
 from app.storage.repository import insert_article_if_new, upsert_source_stat
 from app.web.events import broadcaster
@@ -110,6 +111,10 @@ class CrawlEngine:
                         )
                         content_hash = compute_content_hash(cleaned.title, cleaned.link)
 
+                        signal_hits = extract_signals(cleaned.title, cleaned.summary)
+                        sentiment_score = compute_sentiment_score(signal_hits)
+                        signal_tags = encode_signal_tags(signal_hits)
+
                         is_new = await insert_article_if_new(
                             session,
                             content_hash=content_hash,
@@ -121,6 +126,8 @@ class CrawlEngine:
                             summary=cleaned.summary,
                             published_at=cleaned.published_at,
                             fetched_at=cleaned.fetched_at,
+                            sentiment_score=sentiment_score,
+                            signal_tags=signal_tags or None,
                         )
                         if is_new:
                             new_articles.append(cleaned)
@@ -133,6 +140,8 @@ class CrawlEngine:
                                     "category": category,
                                     "summary": cleaned.summary,
                                     "published_at": cleaned.published_at.isoformat(),
+                                    "sentiment_score": sentiment_score,
+                                    "signals": [h.label for h in signal_hits],
                                 }
                             )
 
