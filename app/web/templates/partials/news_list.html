@@ -1,0 +1,29 @@
+{% for a in articles %}
+<article class="news-card">
+  <div class="news-meta">
+    {% if a.fetched_at|is_recent %}<span class="badge badge-new">NEW</span>{% endif %}
+    <span class="badge badge-tier badge-tier-{{ a.source_tier or 'none' }}">{{ a.source_tier|tier_label }}</span>
+    <span class="badge badge-category">{{ a.category }}</span>
+    <span class="badge badge-source">{{ a.source_name }}</span>
+    <time datetime="{{ a.published_at.isoformat() }}" title="{{ a.published_at.strftime('%Y-%m-%d %H:%M') }}">{{ a.published_at|relative_time }}</time>
+  </div>
+  <h3 class="news-title">
+    <a href="{{ a.link }}" target="_blank" rel="noopener noreferrer">{{ a.title }}</a>
+  </h3>
+  {% if a.summary %}
+  <p class="news-summary">{{ a.summary }}</p>
+  {% endif %}
+</article>
+{% else %}
+<p class="empty-hint">暂无符合条件的新闻，等待下一轮抓取或调整筛选条件。</p>
+{% endfor %}
+
+{% if total_pages > 1 %}
+<div class="pagination">
+  {% for p in range(1, total_pages + 1) %}
+    <a class="{{ 'active' if p == page else '' }}"
+       href="#"
+       onclick="loadPage({{ p }}); return false;">{{ p }}</a>
+  {% endfor %}
+</div>
+{% endif %}

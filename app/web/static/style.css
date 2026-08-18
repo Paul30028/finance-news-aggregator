@@ -1,0 +1,127 @@
+:root {
+  --bg: #0f1115;
+  --card: #171a21;
+  --border: #262b36;
+  --text: #e6e8ec;
+  --muted: #9aa3b2;
+  --accent: #4f8cff;
+  --danger: #e5534b;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.topbar {
+  border-bottom: 1px solid var(--border);
+  background: var(--card);
+}
+.topbar-inner {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.brand { color: var(--text); text-decoration: none; font-weight: 700; font-size: 18px; }
+.topbar nav a { color: var(--muted); text-decoration: none; margin-left: 20px; }
+.topbar nav a:hover { color: var(--accent); }
+
+.container { max-width: 960px; margin: 0 auto; padding: 20px; }
+
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.filter-bar form { display: flex; flex-wrap: wrap; gap: 8px; flex: 1; }
+.filter-bar select, .filter-bar input[type="text"] {
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 8px 10px;
+  border-radius: 6px;
+}
+.filter-bar button, .sources-table button, #add-source-form button {
+  background: var(--accent);
+  border: none;
+  color: white;
+  padding: 8px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.filter-bar button.danger, .sources-table button.danger { background: var(--danger); }
+.total-count { color: var(--muted); font-size: 13px; white-space: nowrap; }
+
+.news-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+}
+.news-meta { display: flex; gap: 8px; align-items: center; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+.badge { padding: 2px 8px; border-radius: 999px; background: #232a38; }
+.badge-category { color: #7cc7ff; }
+.badge-source { color: #9ee6a8; }
+.badge-new { background: #e5534b; color: white; font-weight: 700; }
+.badge-tier-official { background: #1f4f8f; color: #cfe3ff; font-weight: 600; }
+.badge-tier-mainstream { background: #2a3a2f; color: #9ee6a8; }
+.badge-tier-aggregator { background: #3a3320; color: #e6cf7c; }
+.badge-tier-none { color: var(--muted); }
+
+.live-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #3ecf6a;
+  box-shadow: 0 0 0 0 rgba(62, 207, 106, 0.6);
+  animation: pulse 1.6s infinite;
+}
+.live-dot.offline { background: var(--muted); animation: none; }
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 rgba(62, 207, 106, 0.6); }
+  70% { box-shadow: 0 0 0 6px rgba(62, 207, 106, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(62, 207, 106, 0); }
+}
+.news-title { margin: 0 0 6px 0; font-size: 16px; }
+.news-title a { color: var(--text); text-decoration: none; }
+.news-title a:hover { color: var(--accent); }
+.news-summary { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
+
+.empty-hint { color: var(--muted); text-align: center; padding: 40px 0; }
+
+.pagination { display: flex; gap: 6px; justify-content: center; margin: 20px 0; }
+.pagination a {
+  color: var(--muted); text-decoration: none; padding: 4px 10px; border: 1px solid var(--border); border-radius: 4px;
+}
+.pagination a.active { color: white; background: var(--accent); border-color: var(--accent); }
+
+.sources-table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
+.sources-table th, .sources-table td { border-bottom: 1px solid var(--border); padding: 8px 10px; text-align: left; font-size: 13px; }
+.url-cell a { color: var(--muted); word-break: break-all; }
+.badge-on { color: #9ee6a8; }
+.badge-off { color: var(--danger); }
+.error-row td { color: var(--danger); font-size: 12px; }
+
+#add-source-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+#add-source-form input, #add-source-form select {
+  background: var(--card); border: 1px solid var(--border); color: var(--text); padding: 8px 10px; border-radius: 6px;
+}
+
+.footer { text-align: center; color: var(--muted); font-size: 12px; padding: 20px; }

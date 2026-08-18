@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}数据源管理{% endblock %}
+{% block content %}
+<section class="sources-page">
+  <h2>数据源列表</h2>
+  <table class="sources-table">
+    <thead>
+      <tr>
+        <th>名称</th><th>权威度</th><th>类型</th><th>地址</th><th>状态</th><th>抓取间隔</th><th>最近抓取</th><th>累计新增</th><th>操作</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in sources %}
+      {% set stat = stats.get(s.name) %}
+      <tr>
+        <td>{{ s.name }}</td>
+        <td><span class="badge badge-tier badge-tier-{{ s.tier or 'none' }}">{{ s.tier|tier_label }}</span></td>
+        <td>{{ s.type }}</td>
+        <td class="url-cell"><a href="{{ s.url }}" target="_blank" rel="noopener noreferrer">{{ s.url }}</a></td>
+        <td>
+          <span class="badge {{ 'badge-on' if s.enabled else 'badge-off' }}">
+            {{ "启用" if s.enabled else "停用" }}
+          </span>
+        </td>
+        <td>{{ s.interval_seconds ~ "s" if s.interval_seconds else "跟随全局" }}</td>
+        <td>{{ stat.last_run_at.strftime('%Y-%m-%d %H:%M') if stat and stat.last_run_at else "-" }}</td>
+        <td>{{ stat.total_new if stat else 0 }}</td>
+        <td>
+          <button onclick="toggleSource('{{ s.name }}')">切换启停</button>
+          <button onclick="deleteSource('{{ s.name }}')" class="danger">删除</button>
+        </td>
+      </tr>
+      {% if stat and stat.last_error %}
+      <tr class="error-row"><td colspan="9">最近错误：{{ stat.last_error }}</td></tr>
+      {% endif %}
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <h2>新增数据源</h2>
+  <form id="add-source-form" onsubmit="addSource(event)">
+    <input name="name" placeholder="名称" required />
+    <select name="type">
+      <option value="rss">RSS/Atom</option>
+      <option value="html">网页兜底</option>
+    </select>
+    <input name="url" placeholder="源地址" required style="min-width: 320px" />
+    <input name="category_hint" placeholder="分类提示（可选，如 宏观）" />
+    <input name="list_selector" placeholder="CSS选择器（type=html 时必填）" />
+    <input name="interval_seconds" type="number" min="10" placeholder="抓取间隔秒数（留空=全局默认）" />
+    <select name="tier">
+      <option value="">未分级</option>
+      <option value="official">官方权威</option>
+      <option value="mainstream">主流媒体</option>
+      <option value="aggregator">聚合补充</option>
+    </select>
+    <label><input type="checkbox" name="enabled" checked /> 启用</label>
+    <button type="submit">添加</button>
+  </form>
+  <p id="add-source-msg"></p>
+</section>
+
+<script src="/static/app.js"></script>
+{% endblock %}

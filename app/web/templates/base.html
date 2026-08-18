@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}财经新闻聚合{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="/">📈 财经新闻聚合</a>
+      <nav>
+        <a href="/">新闻</a>
+        <a href="/sources">数据源</a>
+      </nav>
+    </div>
+  </header>
+  <main class="container">
+    {% block content %}{% endblock %}
+  </main>
+  <footer class="footer">
+    <p>仅聚合公开、免费、无需登录的新闻源摘要与原文链接，完整内容请点击"查看原文"跳转。</p>
+  </footer>
+</body>
+</html>

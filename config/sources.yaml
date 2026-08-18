@@ -1,0 +1,120 @@
+# =============================================================================
+# 数据源配置文件
+# -----------------------------------------------------------------------------
+# 每个源是一个字典，字段说明：
+#   name          : 源的唯一标识（同时用作展示名），新增/删除源都以此为键
+#   type          : "rss" (优先，走 RSS/Atom 解析) 或 "html" (网页兜底抓取)
+#   url           : 源地址；type=rss 时是 feed 地址，type=html 时是列表页地址
+#   enabled       : 是否启用
+#   category_hint : 可选，若该源整体上高度偏向某一分类，可作为分类打分的初始权重
+#   list_selector : 仅 type=html 需要，CSS 选择器，定位到列表页中每条新闻的 <a> 标签
+#   interval_seconds : 可选，该源专属的抓取间隔（秒）；不填则使用 config.yaml 中
+#                       的 crawler.interval_seconds。每个源独立调度、互不等待，
+#                       对即时性要求高的快讯源可以单独调得更短。
+#   tier          : 权威度分级，纯展示/筛选用途：
+#                     official   官方权威源（监管机构/央行/交易所等一手信息发布方）
+#                     mainstream 主流财经媒体（有采编团队、长期信誉的新闻机构）
+#                     aggregator 聚合/补充源（可能转载/搜索结果，权威性弱于一手来源）
+#
+# 重要合规提示：
+#   1. 仅收录"公开、免费、无需登录"的新闻源；如目标站点后续调整为付费/登录墙，
+#      请立即将其 enabled 设为 false。
+#   2. 下方列出的 URL 为常见公开财经 RSS/新闻源示例，实际使用前请自行核实
+#      其当前可用性、条款与 robots.txt，并按需替换为你确认合规的源。标记了
+#      "⚠️ 请先验证"的条目默认 enabled: false，务必先在浏览器中打开确认可访问、
+#      内容符合预期后再启用——官方机构网站改版可能导致 RSS 地址变化。
+#   3. 新增源时无需重启：调用 POST /api/sources 或直接编辑本文件后调用
+#      POST /api/reload 即可热加载，且会立即为新源启动独立抓取循环。
+# =============================================================================
+
+sources:
+  # ===========================================================================
+  # 一、官方权威源（tier: official）——监管机构/中央银行的一手信息发布，
+  #    权威性最高，但多数官方网站并未提供开箱即用的公开 RSS，或地址会随官网
+  #    改版调整，请务必先手动验证再启用。
+  # ===========================================================================
+  - name: "美联储（Federal Reserve）- 新闻发布"
+    type: rss
+    url: "https://www.federalreserve.gov/feeds/press_all.xml"
+    category_hint: "宏观"
+    tier: official
+    enabled: false  # ⚠️ 请先验证：官网 RSS 地址可能随改版变化
+
+  - name: "美国证券交易委员会（SEC）- 新闻稿"
+    type: rss
+    url: "https://www.sec.gov/news/pressreleases.rss"
+    category_hint: "公司"
+    tier: official
+    enabled: false  # ⚠️ 请先验证
+
+  # ===========================================================================
+  # 二、主流财经媒体（tier: mainstream）——有采编团队、长期信誉的新闻机构，
+  #    是官方一手信息之外最主要的可信来源。
+  # ===========================================================================
+  - name: "BBC News - Business"
+    type: rss
+    url: "http://feeds.bbci.co.uk/news/business/rss.xml"
+    category_hint: "宏观"
+    tier: mainstream
+    enabled: true
+
+  - name: "Yahoo Finance - Top News"
+    type: rss
+    url: "https://finance.yahoo.com/news/rssindex"
+    category_hint: "公司"
+    tier: mainstream
+    enabled: true
+
+  - name: "MarketWatch - Top Stories"
+    type: rss
+    url: "https://feeds.content.dowjones.io/public/rss/mw_topstories"
+    category_hint: "宏观"
+    tier: mainstream
+    enabled: true
+    interval_seconds: 30  # 示例：突发财经消息源可单独调得比全局更快
+
+  - name: "CNBC - Finance"
+    type: rss
+    url: "https://www.cnbc.com/id/10001147/device/rss/rss.html"
+    category_hint: "港美股"
+    tier: mainstream
+    enabled: true
+
+  - name: "WSJ - Markets"
+    type: rss
+    url: "https://feeds.a.dj.com/rss/RSSMarketsMain.xml"
+    category_hint: "港美股"
+    tier: mainstream
+    enabled: false  # ⚠️ 请先验证
+
+  - name: "Investing.com - News"
+    type: rss
+    url: "https://www.investing.com/rss/news.rss"
+    category_hint: "商品"
+    tier: mainstream
+    enabled: false
+
+  # ===========================================================================
+  # 三、聚合/补充源（tier: aggregator）——搜索式聚合结果，条目可能转载自其他
+  #    媒体、权威性弱于一手来源，仅作为覆盖面的补充，不建议作为唯一信息源。
+  # ===========================================================================
+  - name: "Google News - 财经(中文)"
+    type: rss
+    url: "https://news.google.com/rss/search?q=%E8%B4%A2%E7%BB%8F&hl=zh-CN&gl=CN&ceid=CN:zh-Hans"
+    category_hint: "A股"
+    tier: aggregator
+    enabled: true
+
+  # -------------------------------------------------------------------------
+  # 网页兜底抓取示例（默认关闭）。仅当目标站点确无 RSS/Atom 可用，
+  # 且其 robots.txt 未禁止抓取列表页时才建议启用。
+  # list_selector 需要根据实际页面结构调整，抓取到的仅是"标题+链接"，
+  # 详情页正文摘要会尝试二次请求提取，失败时摘要留空，不会报错中断。
+  # -------------------------------------------------------------------------
+  - name: "示例网页源(需自行配置选择器)"
+    type: html
+    url: "https://example.com/finance/news"
+    category_hint: "其他"
+    tier: aggregator
+    list_selector: "a.article-title"
+    enabled: false

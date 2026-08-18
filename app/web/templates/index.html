@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}财经新闻聚合 - 首页{% endblock %}
+{% block content %}
+<section class="filter-bar">
+  <form id="filter-form" onsubmit="applyFilters(event)">
+    <select name="category" id="f-category">
+      <option value="">全部分类</option>
+      {% for c in categories %}
+      <option value="{{ c }}" {{ "selected" if c == current_category else "" }}>{{ c }}</option>
+      {% endfor %}
+    </select>
+
+    <select name="source" id="f-source">
+      <option value="">全部来源</option>
+      {% for s in sources %}
+      <option value="{{ s }}" {{ "selected" if s == current_source else "" }}>{{ s }}</option>
+      {% endfor %}
+    </select>
+
+    <select name="tier" id="f-tier">
+      <option value="">全部权威度</option>
+      {% for value, label in tiers.items() %}
+      <option value="{{ value }}" {{ "selected" if value == current_tier else "" }}>{{ label }}</option>
+      {% endfor %}
+    </select>
+
+    <input type="text" name="q" id="f-q" placeholder="按标题/摘要关键词搜索" value="{{ current_q }}" />
+    <button type="submit">筛选</button>
+    <button type="button" onclick="crawlNow()">立即抓取</button>
+  </form>
+  <span class="total-count">
+    共 <strong id="total-count">{{ total }}</strong> 条
+    · <span class="live-indicator"><span id="live-dot" class="live-dot offline"></span><span id="live-status">连接实时推送中...</span></span>
+  </span>
+</section>
+
+<section id="news-list" class="news-list">
+  {% include "partials/news_list.html" %}
+</section>
+
+<script src="/static/app.js"></script>
+<script>
+  window.APP_STATE = {
+    page: {{ page }},
+    refreshSeconds: {{ refresh_seconds }},
+  };
+  initNewsList();
+  initLiveUpdates();
+</script>
+{% endblock %}

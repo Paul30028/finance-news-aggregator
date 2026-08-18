@@ -1,0 +1,163 @@
+# =============================================================================
+# 即时财经新闻爬取与聚合软件 - 主配置文件
+# 所有可调参数集中在此，修改后重启进程（或调用 /api/reload）即可生效
+# =============================================================================
+
+app:
+  # Web 服务监听地址与端口
+  host: "0.0.0.0"
+  port: 8000
+  # 时区，用于展示发布时间
+  timezone: "Asia/Shanghai"
+
+crawler:
+  # 全局抓取轮询间隔（秒，默认 60）：每个数据源都有自己独立的调度循环
+  # （互不等待），到点即抓，因此这个值直接决定了新闻的即时性上限。
+  # 之所以能把间隔调低而不牺牲合规性，是因为：
+  #   1) 每次请求都会带上 ETag/If-Modified-Since 条件请求头，
+  #      源端内容未变化时只返回 304，不产生实质抓取负载；
+  #   2) 真正约束请求"礼貌程度"的是下面的 per_domain_min_interval_seconds
+  #      和 robots.txt 中的 Crawl-delay，与这个轮询间隔是两回事。
+  # 如需某个源比全局更快/更慢，在 sources.yaml 中为该源单独设置
+  # interval_seconds 覆盖此值即可。
+  interval_seconds: 60
+
+  # 单轮抓取内的最大并发任务数（跨所有源）
+  max_concurrency: 5
+
+  # 同一域名两次请求之间的最小间隔（秒）。这是最重要的合规参数，
+  # 严禁设置得过低；若目标站点 robots.txt 中声明了 Crawl-delay，
+  # 会取二者中较大的值
+  per_domain_min_interval_seconds: 3.0
+
+  # 单次 HTTP 请求超时时间（秒）
+  request_timeout_seconds: 15
+
+  # 请求失败时的最大重试次数（网络错误 / 5xx）
+  max_retries: 3
+
+  # 重试的指数退避基数（秒），第 n 次重试等待 backoff_base * 2^(n-1)
+  retry_backoff_base_seconds: 2.0
+
+  # 遇到 429 / 403 时，对该域名额外增加的降速惩罚（秒），
+  # 会叠加在 per_domain_min_interval_seconds 之上，并按命中次数指数增长，
+  # 直到 max_penalty_seconds 封顶
+  throttle_on_429_403:
+    initial_penalty_seconds: 30
+    max_penalty_seconds: 1800
+    penalty_multiplier: 2.0
+
+  # 请求 User-Agent。请如实标注，不要伪装成浏览器去绕过站点限制
+  user_agent: "FinanceNewsAggregator/1.0 (+https://example.com/bot-info; contact: admin@example.com)"
+
+  # 是否严格遵守 robots.txt。生产环境务必保持 true
+  respect_robots_txt: true
+
+  # robots.txt 缓存时间（秒），避免每次抓取都重新请求 robots.txt
+  robots_cache_ttl_seconds: 3600
+
+  # 正文摘要最大长度（字符数），超出部分截断并加省略号
+  summary_max_length: 200
+
+storage:
+  # SQLite 数据库文件路径（容器内路径，通过 volume 挂载持久化）
+  # 如需切换 PostgreSQL，将其改为 SQLAlchemy 支持的异步 DSN，例如：
+  # "postgresql+asyncpg://user:pass@host:5432/dbname"
+  database_url: "sqlite+aiosqlite:///data/news.db"
+
+# 关键词分类规则：按顺序匹配标题+摘要，命中关键词数最多的分类获胜，
+# 全部未命中则归为"其他"。可自由增删分类与关键词
+classification:
+  categories:
+    宏观:
+      - GDP
+      - CPI
+      - PPI
+      - 央行
+      - 降息
+      - 加息
+      - 财政政策
+      - 货币政策
+      - 就业数据
+      - 通胀
+      - PMI
+      - 美联储
+      - 国务院
+    A股:
+      - A股
+      - 沪指
+      - 深成指
+      - 创业板
+      - 科创板
+      - 上证
+      - 深证
+      - 涨停
+      - 跌停
+      - 北向资金
+      - 沪深300
+    港美股:
+      - 港股
+      - 恒生指数
+      - 纳斯达克
+      - 道琼斯
+      - 标普500
+      - 美股
+      - 纳指
+      - 中概股
+      - 港交所
+    公司:
+      - 财报
+      - 净利润
+      - 营收
+      - 并购
+      - 上市
+      - IPO
+      - 回购
+      - 业绩预告
+      - 董事会
+      - CEO
+      - 增持
+      - 减持
+    商品:
+      - 黄金
+      - 原油
+      - 铜价
+      - 大宗商品
+      - OPEC
+      - 期货
+      - 天然气
+      - 白银
+    外汇:
+      - 汇率
+      - 人民币
+      - 美元指数
+      - 日元
+      - 欧元
+      - 外汇储备
+      - 离岸人民币
+
+  # 全局屏蔽词：标题命中任一屏蔽词的新闻会被直接丢弃（不入库）
+  block_keywords:
+    - "老虎机"
+    - "博彩"
+
+# 推送通知配置（均为可选，默认关闭）
+notify:
+  webhook:
+    enabled: false
+    # 建议通过环境变量 WEBHOOK_URL 注入，避免把地址写死在配置文件里
+    url_env: "WEBHOOK_URL"
+  telegram:
+    enabled: false
+    # Bot Token 与 Chat ID 通过环境变量注入，见 .env.example
+    bot_token_env: "TELEGRAM_BOT_TOKEN"
+    chat_id_env: "TELEGRAM_CHAT_ID"
+  # 每轮抓取最多推送多少条，避免刷屏
+  max_items_per_push: 10
+
+logging:
+  level: "INFO"
+  # 日志文件路径，留空则只输出到 stdout
+  file: "data/app.log"
+  max_bytes: 5242880
+  backup_count: 3
