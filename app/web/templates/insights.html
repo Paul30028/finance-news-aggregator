@@ -1,5 +1,32 @@
 {% extends "base.html" %}
 {% block title %}策略简报{% endblock %}
+
+{% macro signal_card(a) %}
+<article class="news-card compact {{ 'is-alert' if a.is_alert else '' }}">
+  <div class="news-meta">
+    {% if a.is_alert %}<span class="badge badge-alert">🔔 重点信号</span>{% endif %}
+    <span class="badge badge-tier badge-tier-{{ a.source_tier or 'none' }}">{{ a.source_tier|tier_label }}</span>
+    <span class="badge badge-category">{{ a.category }}</span>
+    <span class="badge badge-source">{{ a.source_name }}</span>
+    <time>{{ a.published_at|relative_time }}</time>
+  </div>
+  <h4 class="news-title"><a href="{{ a.link }}" target="_blank" rel="noopener noreferrer">{{ a.title }}</a></h4>
+  <div class="signal-tags">
+    {% for code, label, polarity in a.signals %}
+    <span class="signal-chip {{ 'signal-pos' if polarity > 0 else ('signal-neg' if polarity < 0 else 'signal-neutral') }}">
+      {{ "▲" if polarity > 0 else ("▼" if polarity < 0 else "●") }} {{ label }}
+    </span>
+    {% endfor %}
+  </div>
+  {% if a.watch_note %}
+  <p class="watch-note">
+    <span class="watch-note-label">{{ a.confidence }}</span>
+    <span>建议关注：{{ a.watch_note }}</span>
+  </p>
+  {% endif %}
+</article>
+{% endmacro %}
+
 {% block content %}
 <section class="insights-header">
   <div class="window-picker">
@@ -10,8 +37,8 @@
     <a href="/insights?window=168" class="{{ 'active' if window == 168 else '' }}">7天</a>
   </div>
   <p class="disclaimer">
-    ⚠️ 以下统计基于新闻标题/摘要的关键词规则匹配自动生成（规则见
-    <code>app/processing/signals.py</code>），是对已抓取公开新闻的客观整理，
+    ⚠️ 以下统计与"建议关注"均基于新闻标题/摘要的关键词规则匹配自动生成（规则见
+    <code>app/processing/signals.py</code>），是对已抓取公开新闻的客观整理与后续核实提示，
     <strong>不构成任何投资建议</strong>，据此操作风险自负。
   </p>
 </section>
@@ -33,6 +60,19 @@
     <div class="stat-value">{{ briefing.neutral_count }}</div>
     <div class="stat-label">中性/未命中规则</div>
   </div>
+</section>
+
+<section class="insights-alerts">
+  <h3>🔔 本窗口重点信号（多重信号叠加或强度较高，建议优先查看）</h3>
+  {% if briefing.alerts %}
+  <div class="alert-grid">
+    {% for a in briefing.alerts %}
+      {{ signal_card(a) }}
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="empty-hint">窗口内暂无达到提醒门槛的重点信号（门槛可在 config.yaml 的 signals.alert_threshold 调整）</p>
+  {% endif %}
 </section>
 
 <section class="insights-columns">
@@ -80,22 +120,7 @@
   <div class="insights-col">
     <h3>重点关注 · 偏利好</h3>
     {% for a in briefing.top_bullish %}
-    <article class="news-card compact">
-      <div class="news-meta">
-        <span class="badge badge-tier badge-tier-{{ a.source_tier or 'none' }}">{{ a.source_tier|tier_label }}</span>
-        <span class="badge badge-category">{{ a.category }}</span>
-        <span class="badge badge-source">{{ a.source_name }}</span>
-        <time>{{ a.published_at|relative_time }}</time>
-      </div>
-      <h4 class="news-title"><a href="{{ a.link }}" target="_blank" rel="noopener noreferrer">{{ a.title }}</a></h4>
-      <div class="signal-tags">
-        {% for code, label, polarity in a.signals %}
-        <span class="signal-chip {{ 'signal-pos' if polarity > 0 else ('signal-neg' if polarity < 0 else 'signal-neutral') }}">
-          {{ "▲" if polarity > 0 else ("▼" if polarity < 0 else "●") }} {{ label }}
-        </span>
-        {% endfor %}
-      </div>
-    </article>
+      {{ signal_card(a) }}
     {% else %}
     <p class="empty-hint">窗口内暂无偏利好信号的新闻</p>
     {% endfor %}
@@ -104,22 +129,7 @@
   <div class="insights-col">
     <h3>重点关注 · 偏利空</h3>
     {% for a in briefing.top_bearish %}
-    <article class="news-card compact">
-      <div class="news-meta">
-        <span class="badge badge-tier badge-tier-{{ a.source_tier or 'none' }}">{{ a.source_tier|tier_label }}</span>
-        <span class="badge badge-category">{{ a.category }}</span>
-        <span class="badge badge-source">{{ a.source_name }}</span>
-        <time>{{ a.published_at|relative_time }}</time>
-      </div>
-      <h4 class="news-title"><a href="{{ a.link }}" target="_blank" rel="noopener noreferrer">{{ a.title }}</a></h4>
-      <div class="signal-tags">
-        {% for code, label, polarity in a.signals %}
-        <span class="signal-chip {{ 'signal-pos' if polarity > 0 else ('signal-neg' if polarity < 0 else 'signal-neutral') }}">
-          {{ "▲" if polarity > 0 else ("▼" if polarity < 0 else "●") }} {{ label }}
-        </span>
-        {% endfor %}
-      </div>
-    </article>
+      {{ signal_card(a) }}
     {% else %}
     <p class="empty-hint">窗口内暂无偏利空信号的新闻</p>
     {% endfor %}

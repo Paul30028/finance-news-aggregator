@@ -100,3 +100,33 @@ async def test_briefing_signal_and_category_counts(session_factory):
     signal_map = {s.code: s.count for s in briefing.signal_counts}
     assert signal_map["rate_cut"] == 2
     assert signal_map["earnings_miss"] == 1
+
+
+@pytest.mark.asyncio
+async def test_briefing_alerts_only_include_articles_above_threshold(session_factory):
+    # 默认门槛 alert_threshold=2（见 config/config.yaml）。单一信号（分值1）不应进入 alerts，
+    # 双重信号叠加（分值2）应该进入。
+    await _insert(session_factory, title="公司宣布股票回购", summary="", source_name="A")  # score=1
+    await _insert(
+        session_factory, title="央行降息叠加公司股票回购", summary="", source_name="B"
+    )  # score=2
+
+    async with session_factory() as session:
+        briefing = await build_briefing(session, window_hours=24)
+
+    alert_sources = {a.source_name for a in briefing.alerts}
+    assert "B" in alert_sources
+    assert "A" not in alert_sources
+
+
+@pytest.mark.asyncio
+async def test_briefing_article_brief_carries_watch_note_and_confidence(session_factory):
+    await _insert(session_factory, title="央行宣布降息", summary="市场普遍看好", source_name="A")
+
+    async with session_factory() as session:
+        briefing = await build_briefing(session, window_hours=24)
+
+    brief = briefing.top_bullish[0]
+    assert brief.watch_note  # 应该带有从 ACTION_HINTS 生成的关注建议
+    assert "单一信号" in brief.confidence
+    assert brief.is_alert is False  # 单一信号(分值1)低于默认门槛(2)

@@ -20,7 +20,8 @@ from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.processing.signals import decode_signal_tags
+from app.config import get_settings
+from app.processing.signals import conclusion_for_codes, decode_signal_tags, is_alert_score
 from app.storage.models import Article
 from app.storage.repository import list_articles_since
 
@@ -37,6 +38,9 @@ class ArticleBrief:
     published_at: datetime
     sentiment_score: int
     signals: list[tuple[str, str, int]]  # (code, label, polarity)
+    watch_note: str
+    confidence: str
+    is_alert: bool
 
 
 @dataclass
@@ -63,11 +67,14 @@ class BriefingResult:
     neutral_count: int
     top_bullish: list[ArticleBrief] = field(default_factory=list)
     top_bearish: list[ArticleBrief] = field(default_factory=list)
+    alerts: list[ArticleBrief] = field(default_factory=list)
     category_counts: list[CategoryCount] = field(default_factory=list)
     signal_counts: list[SignalCount] = field(default_factory=list)
 
 
 def _to_brief(article: Article) -> ArticleBrief:
+    decoded = decode_signal_tags(article.signal_tags)
+    watch_note, confidence = conclusion_for_codes([code for code, _, _ in decoded])
     return ArticleBrief(
         id=article.id,
         title=article.title,
@@ -78,7 +85,10 @@ def _to_brief(article: Article) -> ArticleBrief:
         summary=article.summary,
         published_at=article.published_at,
         sentiment_score=article.sentiment_score,
-        signals=decode_signal_tags(article.signal_tags),
+        signals=decoded,
+        watch_note=watch_note,
+        confidence=confidence,
+        is_alert=is_alert_score(article.sentiment_score, get_settings().signals.alert_threshold),
     )
 
 
@@ -94,6 +104,13 @@ async def build_briefing(
 
     top_bullish = sorted(bullish, key=lambda a: (a.sentiment_score, a.published_at), reverse=True)[:top_n]
     top_bearish = sorted(bearish, key=lambda a: (a.sentiment_score, -a.published_at.timestamp()))[:top_n]
+
+    alert_threshold = get_settings().signals.alert_threshold
+    alerts = sorted(
+        (a for a in articles if is_alert_score(a.sentiment_score, alert_threshold)),
+        key=lambda a: (abs(a.sentiment_score), a.published_at),
+        reverse=True,
+    )[:top_n]
 
     category_counter = Counter(a.category for a in articles)
     category_counts = [
@@ -120,6 +137,7 @@ async def build_briefing(
         neutral_count=neutral_count,
         top_bullish=[_to_brief(a) for a in top_bullish],
         top_bearish=[_to_brief(a) for a in top_bearish],
+        alerts=[_to_brief(a) for a in alerts],
         category_counts=category_counts,
         signal_counts=signal_counts,
     )

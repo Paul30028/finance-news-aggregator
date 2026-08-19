@@ -21,10 +21,16 @@ from app.crawler.dedup import compute_content_hash
 from app.crawler.html_fallback import extract_list_items, extract_summary
 from app.crawler.http_client import NOT_MODIFIED, CompliantFetcher, FetchBlockedError, FetchFailedError
 from app.crawler.rss_parser import RawArticle, parse_rss
-from app.notify.dispatcher import dispatch_new_articles
+from app.notify.dispatcher import SignalAlert, dispatch_new_articles, dispatch_signal_alerts
 from app.processing.classifier import classify
 from app.processing.cleaner import CleanedArticle, clean_article, is_blocked
-from app.processing.signals import compute_sentiment_score, encode_signal_tags, extract_signals
+from app.processing.signals import (
+    compute_sentiment_score,
+    conclusion_for_codes,
+    encode_signal_tags,
+    extract_signals,
+    is_alert_score,
+)
 from app.storage.db import get_session
 from app.storage.repository import insert_article_if_new, upsert_source_stat
 from app.web.events import broadcaster
@@ -84,6 +90,7 @@ class CrawlEngine:
         settings = get_settings()
         new_articles: list[CleanedArticle] = []
         broadcast_payload: list[dict] = []
+        signal_alerts: list[SignalAlert] = []
         fetched_count = 0
         error_msg = None
 
@@ -131,6 +138,10 @@ class CrawlEngine:
                         )
                         if is_new:
                             new_articles.append(cleaned)
+                            watch_note, confidence = conclusion_for_codes(
+                                [h.code for h in signal_hits]
+                            )
+                            is_alert = is_alert_score(sentiment_score, settings.signals.alert_threshold)
                             broadcast_payload.append(
                                 {
                                     "title": cleaned.title,
@@ -142,8 +153,23 @@ class CrawlEngine:
                                     "published_at": cleaned.published_at.isoformat(),
                                     "sentiment_score": sentiment_score,
                                     "signals": [h.label for h in signal_hits],
+                                    "watch_note": watch_note,
+                                    "confidence": confidence,
+                                    "is_alert": is_alert,
                                 }
                             )
+                            if is_alert:
+                                signal_alerts.append(
+                                    SignalAlert(
+                                        title=cleaned.title,
+                                        link=cleaned.link,
+                                        source_name=cleaned.source_name,
+                                        sentiment_score=sentiment_score,
+                                        signal_labels=[h.label for h in signal_hits],
+                                        watch_note=watch_note,
+                                        confidence=confidence,
+                                    )
+                                )
 
             except FetchBlockedError:
                 error_msg = "robots.txt 禁止抓取"
@@ -176,6 +202,13 @@ class CrawlEngine:
                 await dispatch_new_articles(settings.notify, new_articles)
             except Exception:  # noqa: BLE001
                 logger.exception("推送新文章时发生异常")
+
+        if signal_alerts and settings.signals.push_alerts:
+            logger.info("源 [%s] 命中 %d 条重点信号，发送独立提醒", source.name, len(signal_alerts))
+            try:
+                await dispatch_signal_alerts(settings.notify, signal_alerts)
+            except Exception:  # noqa: BLE001
+                logger.exception("推送重点信号提醒时发生异常")
 
         return new_articles
 

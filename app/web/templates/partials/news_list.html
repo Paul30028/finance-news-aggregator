@@ -1,7 +1,10 @@
 {% for a in articles %}
-<article class="news-card">
+{% set sigs = a.signal_tags|signals %}
+{% set is_alert = a.sentiment_score|is_alert_score %}
+<article class="news-card {{ 'is-alert' if is_alert else '' }}">
   <div class="news-meta">
     {% if a.fetched_at|is_recent %}<span class="badge badge-new">NEW</span>{% endif %}
+    {% if is_alert %}<span class="badge badge-alert">🔔 重点信号</span>{% endif %}
     <span class="badge badge-tier badge-tier-{{ a.source_tier or 'none' }}">{{ a.source_tier|tier_label }}</span>
     <span class="badge badge-category">{{ a.category }}</span>
     <span class="badge badge-source">{{ a.source_name }}</span>
@@ -13,7 +16,6 @@
   {% if a.summary %}
   <p class="news-summary">{{ a.summary }}</p>
   {% endif %}
-  {% set sigs = a.signal_tags|signals %}
   {% if sigs %}
   <div class="signal-tags">
     {% for code, label, polarity in sigs %}
@@ -22,6 +24,10 @@
     </span>
     {% endfor %}
   </div>
+  {% set watch_note, confidence = sigs|conclusion %}
+  {% if watch_note %}
+  <p class="watch-note"><span class="watch-note-label">{{ confidence }}</span><span>建议关注：{{ watch_note }}</span></p>
+  {% endif %}
   {% endif %}
 </article>
 {% else %}

@@ -6,10 +6,14 @@
 并购、监管风险、违约破产、IPO、供给端变化等），并给每个信号打上极性
 （利好 +1 / 利空 -1 / 中性 0），加总得到该文章的粗略情绪分。
 
+除了信号本身，本模块还维护一份 ACTION_HINTS（每类信号对应"建议关注的后续信息"），
+用于把"检测到了什么"进一步整理成"接下来该看什么"，让分析结果更"可行动"——但这里的
+"行动"始终是"去核实更多信息"，而不是任何形式的买卖指令。
+
 刻意的设计边界：
   - 这不是情感分析模型，也不做语义理解，只做关键词命中，规则和权重完全透明、
     可审计、可在本文件里直接增删，不存在"黑箱判断"。
-  - 输出只是"文章命中了哪些预定义信号词"这一客观事实的结构化整理，
+  - 输出只是"文章命中了哪些预定义信号词，以及这类事件通常还需要核实什么"，
     不构成、也不应被解读为投资建议——具体解读需要结合完整上下文和专业判断。
 """
 from __future__ import annotations
@@ -79,6 +83,54 @@ SIGNAL_RULES: list[tuple[str, str, int, list[str]]] = [
 ]
 
 _SIGNAL_BY_CODE = {code: (label, polarity) for code, label, polarity, _ in SIGNAL_RULES}
+
+# 每类信号对应的"建议关注的后续信息"——不是操作指令，而是"这类事件通常还需要
+# 看什么才能形成更完整的判断"，帮助从"看到一条新闻"过渡到"知道下一步该查什么"。
+ACTION_HINTS: dict[str, str] = {
+    "rate_cut": "后续关注同期 CPI/PMI 等数据是否印证宽松基调，以及权益/债券市场的实际反应",
+    "rate_hike": "后续关注该经济体通胀数据走势，以及后续会议是否释放进一步紧缩信号",
+    "earnings_beat": "关注管理层对下季度的指引，以及同业公司是否有相似趋势",
+    "earnings_miss": "关注公司给出的下滑原因说明，以及是否为行业性而非个案问题",
+    "upgrade": "关注该机构给出的具体理由与目标价，并与其他机构观点对照",
+    "downgrade": "关注下调理由是基本面恶化还是估值调整，避免只看结论不看依据",
+    "buyback_dividend": "关注回购/分红的具体规模与资金来源，判断是否反映管理层信心",
+    "insider_selling": "关注减持方是否为控股股东/高管，及减持原因说明（如有）",
+    "mna": "关注交易对价、支付方式、监管审批进度，交易能否完成存在不确定性",
+    "regulatory_risk": "关注涉事金额/范围、公司回应，以及是否会升级为更严重的合规后果",
+    "default_bankruptcy": "关注债务规模、债权人反应及后续重组方案",
+    "ipo_listing": "关注发行估值、募资用途及基石投资者构成",
+    "supply_shock": "关注影响持续时间，以及下游相关行业的连锁反应",
+}
+
+_ALERT_CONFIDENCE_LABELS = {
+    0: "",
+    1: "单一信号，建议结合更多信息交叉验证",
+    2: "双重信号叠加，关注度提升",
+}
+_ALERT_CONFIDENCE_LABEL_MAX = "多重信号叠加，建议优先关注"
+
+
+def conclusion_for_codes(codes: list[str]) -> tuple[str, str]:
+    """根据命中的信号代码，生成 (关注建议, 信号强度描述) 二元组，供展示层使用。
+
+    "信号强度"指的是同一篇文章命中了几种不同的预定义信号类型（越多说明多个规则
+    同时给出一致或相关的提示），不是对事件重要性或后续走势的预测。
+    """
+    unique_codes = list(dict.fromkeys(codes))  # 去重且保持原有顺序
+    if not unique_codes:
+        return "", ""
+
+    hints = [ACTION_HINTS[c] for c in unique_codes if c in ACTION_HINTS]
+    watch_note = "；".join(hints[:2])  # 最多展示两条，保持简洁
+
+    n = len(unique_codes)
+    confidence = _ALERT_CONFIDENCE_LABELS.get(n, _ALERT_CONFIDENCE_LABEL_MAX)
+    return watch_note, confidence
+
+
+def is_alert_score(score: int, threshold: int) -> bool:
+    """判断情绪分是否达到"重点信号"门槛（绝对值 >= threshold）。"""
+    return abs(score) >= threshold
 
 
 @dataclass

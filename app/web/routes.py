@@ -20,7 +20,7 @@ from fastapi.templating import Jinja2Templates
 
 from app.analysis.briefing import build_briefing
 from app.config import SourceConfig, get_settings, reload_settings, save_sources
-from app.processing.signals import decode_signal_tags
+from app.processing.signals import conclusion_for_codes, decode_signal_tags, is_alert_score
 from app.scheduler import scheduler
 from app.storage.db import get_session
 from app.storage.repository import (
@@ -81,10 +81,20 @@ def _tier_label(tier: str | None) -> str:
     return TIER_LABELS.get(tier or "", "未分级")
 
 
+def _article_is_alert(sentiment_score: int) -> bool:
+    return is_alert_score(sentiment_score, get_settings().signals.alert_threshold)
+
+
+def _article_conclusion(decoded_signals: list[tuple[str, str, int]]) -> tuple[str, str]:
+    return conclusion_for_codes([code for code, _, _ in decoded_signals])
+
+
 templates.env.filters["relative_time"] = _relative_time
 templates.env.filters["is_recent"] = _is_recent
 templates.env.filters["tier_label"] = _tier_label
 templates.env.filters["signals"] = decode_signal_tags
+templates.env.filters["is_alert_score"] = _article_is_alert
+templates.env.filters["conclusion"] = _article_conclusion
 
 
 async def _fetch_page(
@@ -191,6 +201,9 @@ async def api_insights(window: int = Query(default=24, ge=1, le=168)):
             "category": a.category,
             "sentiment_score": a.sentiment_score,
             "signals": [{"code": c, "label": l, "polarity": p} for c, l, p in a.signals],
+            "watch_note": a.watch_note,
+            "confidence": a.confidence,
+            "is_alert": a.is_alert,
             "published_at": a.published_at.isoformat(),
         }
 
@@ -203,6 +216,7 @@ async def api_insights(window: int = Query(default=24, ge=1, le=168)):
         "neutral_count": briefing.neutral_count,
         "top_bullish": [_article_dict(a) for a in briefing.top_bullish],
         "top_bearish": [_article_dict(a) for a in briefing.top_bearish],
+        "alerts": [_article_dict(a) for a in briefing.alerts],
         "category_counts": [{"category": c.category, "count": c.count} for c in briefing.category_counts],
         "signal_counts": [
             {"code": s.code, "label": s.label, "polarity": s.polarity, "count": s.count}

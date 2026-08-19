@@ -57,6 +57,34 @@ function initNewsList() {
   setInterval(() => refreshList(window.APP_STATE.page), 30 * 1000);
 }
 
+// 悬浮提示"重点信号"：只在到达门槛(config.yaml -> signals.alert_threshold)的
+// 文章出现时弹出，避免和常规新闻推送混在一起、被淹没。
+function showAlertBanner(alertItems) {
+  let banner = document.getElementById("alert-banner");
+  if (!banner) {
+    banner = document.createElement("div");
+    banner.id = "alert-banner";
+    banner.className = "alert-banner";
+    document.body.appendChild(banner);
+  }
+  const list = alertItems
+    .slice(0, 3)
+    .map((i) => `<a href="${i.link}" target="_blank" rel="noopener noreferrer">${i.title}</a>`)
+    .join("");
+  banner.innerHTML = `
+    <div class="alert-banner-inner">
+      <strong>🔔 检测到重点信号</strong>
+      <div class="alert-banner-list">${list}</div>
+      <div class="alert-banner-footer">
+        <a href="/insights">查看完整策略简报 →</a>
+        <button onclick="document.getElementById('alert-banner').remove()">关闭</button>
+      </div>
+    </div>`;
+  banner.style.display = "block";
+  clearTimeout(window._alertBannerTimer);
+  window._alertBannerTimer = setTimeout(() => banner.remove(), 20000);
+}
+
 // ------------------------- 实时推送（SSE） -------------------------
 
 function initLiveUpdates() {
@@ -82,8 +110,16 @@ function initLiveUpdates() {
       return;
     }
     if (!items.length) return;
-    if (status) status.textContent = `刚刚推送 ${items.length} 条新新闻`;
-    // 新文章已经立即入库，这里直接刷新当前视图即可看到（含 NEW 徽标）
+    const alertCount = items.filter((i) => i.is_alert).length;
+    if (status) {
+      status.textContent = alertCount > 0
+        ? `🔔 检测到 ${alertCount} 条重点信号（共推送 ${items.length} 条）`
+        : `刚刚推送 ${items.length} 条新新闻`;
+    }
+    if (alertCount > 0) {
+      showAlertBanner(items.filter((i) => i.is_alert));
+    }
+    // 新文章已经立即入库，这里直接刷新当前视图即可看到（含 NEW / 重点信号徽标）
     refreshList(window.APP_STATE.page);
   };
 

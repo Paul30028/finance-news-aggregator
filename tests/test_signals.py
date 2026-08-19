@@ -1,4 +1,13 @@
-from app.processing.signals import compute_sentiment_score, decode_signal_tags, encode_signal_tags, extract_signals
+from app.processing.signals import (
+    ACTION_HINTS,
+    SIGNAL_RULES,
+    compute_sentiment_score,
+    conclusion_for_codes,
+    decode_signal_tags,
+    encode_signal_tags,
+    extract_signals,
+    is_alert_score,
+)
 
 
 def test_extract_signals_detects_rate_cut_as_bullish():
@@ -49,3 +58,44 @@ def test_encode_decode_signal_tags_roundtrip():
 def test_decode_signal_tags_handles_none_and_empty():
     assert decode_signal_tags(None) == []
     assert decode_signal_tags("") == []
+
+
+def test_every_signal_rule_has_an_action_hint():
+    # 每个信号类型都应该有对应的"关注建议"，否则 conclusion_for_codes 会静默漏掉它
+    for code, _label, _polarity, _keywords in SIGNAL_RULES:
+        assert code in ACTION_HINTS, f"信号 '{code}' 缺少 ACTION_HINTS 条目"
+
+
+def test_conclusion_for_codes_empty_when_no_hits():
+    assert conclusion_for_codes([]) == ("", "")
+
+
+def test_conclusion_for_codes_single_signal():
+    watch_note, confidence = conclusion_for_codes(["rate_cut"])
+    assert watch_note == ACTION_HINTS["rate_cut"]
+    assert "单一信号" in confidence
+
+
+def test_conclusion_for_codes_multiple_signals_raises_confidence():
+    watch_note, confidence = conclusion_for_codes(["rate_cut", "buyback_dividend"])
+    assert ACTION_HINTS["rate_cut"] in watch_note
+    assert ACTION_HINTS["buyback_dividend"] in watch_note
+    assert "双重信号" in confidence
+
+
+def test_conclusion_for_codes_dedupes_repeated_codes():
+    # 同一信号代码出现两次不应被当成"双重信号"
+    _, confidence = conclusion_for_codes(["rate_cut", "rate_cut"])
+    assert "单一信号" in confidence
+
+
+def test_conclusion_for_codes_three_or_more_uses_max_label():
+    _, confidence = conclusion_for_codes(["rate_cut", "buyback_dividend", "upgrade"])
+    assert confidence == "多重信号叠加，建议优先关注"
+
+
+def test_is_alert_score_respects_threshold():
+    assert is_alert_score(2, threshold=2) is True
+    assert is_alert_score(-2, threshold=2) is True
+    assert is_alert_score(1, threshold=2) is False
+    assert is_alert_score(0, threshold=2) is False

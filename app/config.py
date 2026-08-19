@@ -109,6 +109,16 @@ class NotifyConfig:
 
 
 @dataclass
+class SignalsConfig:
+    # "重点信号"判定门槛：文章情绪分（命中信号极性之和）的绝对值达到此值才算"重点信号"，
+    # 用于 Web 端提醒横幅、新闻卡片"重点信号"徽标，以及可选的独立 Webhook/Telegram 推送。
+    alert_threshold: int = 2
+    # 是否在常规"新文章"推送之外，额外为"重点信号"发送一条内容更完整的独立提醒
+    # （含关注建议与免责声明）。仅在 notify.webhook / notify.telegram 本身已启用时生效。
+    push_alerts: bool = True
+
+
+@dataclass
 class AppMeta:
     host: str = "0.0.0.0"
     port: int = 8000
@@ -130,6 +140,7 @@ class Settings:
     storage: StorageConfig
     classification: ClassificationConfig
     notify: NotifyConfig
+    signals: SignalsConfig
     logging: LoggingConfig
     sources: list[SourceConfig]
 
@@ -151,6 +162,7 @@ def _build_settings() -> Settings:
     storage_raw = raw_app.get("storage", {})
     classification_raw = raw_app.get("classification", {})
     notify_raw = raw_app.get("notify", {})
+    signals_raw = raw_app.get("signals", {})
     logging_raw = raw_app.get("logging", {})
 
     settings = Settings(
@@ -191,6 +203,10 @@ def _build_settings() -> Settings:
             webhook=WebhookNotifyConfig(**(notify_raw.get("webhook", {}) or {})),
             telegram=TelegramNotifyConfig(**(notify_raw.get("telegram", {}) or {})),
             max_items_per_push=int(notify_raw.get("max_items_per_push", 10)),
+        ),
+        signals=SignalsConfig(
+            alert_threshold=int(signals_raw.get("alert_threshold", 2)),
+            push_alerts=bool(signals_raw.get("push_alerts", True)),
         ),
         logging=LoggingConfig(
             level=logging_raw.get("level", "INFO"),
