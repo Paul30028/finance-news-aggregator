@@ -135,6 +135,32 @@ classification:
       - 欧元
       - 外汇储备
       - 离岸人民币
+    科技:
+      - 人工智能
+      - AI
+      - 大模型
+      - ChatGPT
+      - OpenAI
+      - 芯片
+      - 半导体
+      - 英伟达
+      - Nvidia
+      - 机器人
+      - 自动驾驶
+      - chip
+      - semiconductor
+      - artificial intelligence
+    加密货币:
+      - 比特币
+      - 以太坊
+      - 加密货币
+      - 数字货币
+      - bitcoin
+      - ethereum
+      - crypto
+      - cryptocurrency
+      - defi
+      - NFT
 
   # 全局屏蔽词：标题命中任一屏蔽词的新闻会被直接丢弃（不入库）
   block_keywords:

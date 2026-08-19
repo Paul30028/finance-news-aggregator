@@ -25,6 +25,14 @@
 #      内容符合预期后再启用——官方机构网站改版可能导致 RSS 地址变化。
 #   3. 新增源时无需重启：调用 POST /api/sources 或直接编辑本文件后调用
 #      POST /api/reload 即可热加载，且会立即为新源启动独立抓取循环。
+#
+# 关于"财联社/华尔街见闻/金十数据/东方财经·同花顺 7×24 快讯"等 P0 级中文快讯源：
+#   这些是商业化的付费快讯产品，据核实均未公开提供免费 RSS/Atom 接口——它们的
+#   商业模式本身就建立在"抢先看到"这个独占优势上。本文件不会为它们编造一个
+#   看似合理实则不存在的 RSS 地址。下方"四、间接聚合补充"用 Google News 的
+#   站内搜索作为部分覆盖的折中方案（有分钟级延迟，覆盖也不完整）；如需真正
+#   的秒级独家快讯，通常需要对方的官方付费数据接口/OpenAPI（如财联社面向
+#   机构的电报数据服务），这超出了"公开免费抓取"的范畴，请自行评估采购。
 # =============================================================================
 
 sources:
@@ -32,6 +40,12 @@ sources:
   # 一、官方权威源（tier: official）——监管机构/中央银行的一手信息发布，
   #    权威性最高，但多数官方网站并未提供开箱即用的公开 RSS，或地址会随官网
   #    改版调整，请务必先手动验证再启用。
+  #
+  #    中国人民银行、证监会、国家统计局、发改委等国内监管/统计机构官网，
+  #    以及欧央行(ECB)、日本央行(BOJ)、英国央行(BOE)，据核实均未提供稳定
+  #    可用的标准 RSS 订阅入口（部分仅有邮件订阅或站内"最新发布"列表页）。
+  #    没有把它们写成配置项，是因为没有可以负责任地确认的真实地址；如果你
+  #    找到了实际可用的订阅入口，可以照下面 Fed/SEC 的格式自行添加。
   # ===========================================================================
   - name: "美联储（Federal Reserve）- 新闻发布"
     type: rss
@@ -50,6 +64,11 @@ sources:
   # ===========================================================================
   # 二、主流财经媒体（tier: mainstream）——有采编团队、长期信誉的新闻机构，
   #    是官方一手信息之外最主要的可信来源。
+  #
+  #    Reuters（路透）已于 2020 年前后下线了长期提供的公开 RSS 服务，Bloomberg
+  #    (Markets/Technology/Economics) 也从未面向公众提供免费 RSS——两者的内容
+  #    分发都收归到付费终端/订阅体系，因此清单里没有为它们配置条目。公开、
+  #    可验证的替代覆盖见下面 CNBC / MarketWatch / WSJ Markets。
   # ===========================================================================
   - name: "BBC News - Business"
     type: rss
@@ -94,6 +113,27 @@ sources:
     tier: mainstream
     enabled: false
 
+  - name: "TechCrunch"
+    type: rss
+    url: "https://techcrunch.com/feed/"
+    category_hint: "科技"
+    tier: mainstream
+    enabled: true  # WordPress 标准 /feed/ 端点，长期稳定，可直接使用
+
+  - name: "OilPrice.com - Energy News"
+    type: rss
+    url: "https://oilprice.com/rss/main"
+    category_hint: "商品"
+    tier: mainstream
+    enabled: false  # ⚠️ 请先验证：具体 RSS 路径未百分百确认
+
+  - name: "CoinDesk"
+    type: rss
+    url: "https://www.coindesk.com/arc/outboundfeeds/rss"
+    category_hint: "加密货币"
+    tier: mainstream
+    enabled: false  # ⚠️ 请先验证：CoinDesk 改版可能调整过 feed 路径
+
   # ===========================================================================
   # 三、聚合/补充源（tier: aggregator）——搜索式聚合结果，条目可能转载自其他
   #    媒体、权威性弱于一手来源，仅作为覆盖面的补充，不建议作为唯一信息源。
@@ -102,6 +142,33 @@ sources:
     type: rss
     url: "https://news.google.com/rss/search?q=%E8%B4%A2%E7%BB%8F&hl=zh-CN&gl=CN&ceid=CN:zh-Hans"
     category_hint: "A股"
+    tier: aggregator
+    enabled: true
+
+  # ===========================================================================
+  # 四、间接聚合补充：对"无公开 RSS 的头部中文快讯源"的折中覆盖方案
+  #    用 Google News 的 site: 站内搜索，只请求 Google 自家的公开 RSS 端点，
+  #    不直接抓取目标站点，天然合规；但代价是有分钟级延迟、覆盖不完整，
+  #    不能替代这些平台官方的实时快讯产品，请按此预期使用。
+  # ===========================================================================
+  - name: "Google News - 财联社 相关报道"
+    type: rss
+    url: "https://news.google.com/rss/search?q=site%3Acls.cn&hl=zh-CN&gl=CN&ceid=CN:zh-Hans"
+    category_hint: "A股"
+    tier: aggregator
+    enabled: true
+
+  - name: "Google News - 华尔街见闻 相关报道"
+    type: rss
+    url: "https://news.google.com/rss/search?q=site%3Awallstreetcn.com&hl=zh-CN&gl=CN&ceid=CN:zh-Hans"
+    category_hint: "宏观"
+    tier: aggregator
+    enabled: true
+
+  - name: "Google News - 金十数据 相关报道"
+    type: rss
+    url: "https://news.google.com/rss/search?q=site%3Ajin10.com&hl=zh-CN&gl=CN&ceid=CN:zh-Hans"
+    category_hint: "宏观"
     tier: aggregator
     enabled: true
 
